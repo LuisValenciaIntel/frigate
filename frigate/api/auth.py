@@ -11,9 +11,11 @@ import re
 import secrets
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
 from datetime import datetime
 from pathlib import Path
+from typing import Optional
 
 from fastapi import APIRouter, Request, Response
 from fastapi.responses import JSONResponse, RedirectResponse
@@ -209,6 +211,62 @@ def get_login_request_ip(request: Request) -> str:
     return "unknown"
 
 
+def is_public_ip(ip_address: str) -> bool:
+    try:
+        return ipaddress.ip_address(ip_address).is_global
+    except ValueError:
+        logger.debug(f"Unable to parse login IP address for geolocation: {ip_address}")
+        return False
+
+
+def get_login_request_location(
+    ip_address: str, location_api_url: str, timeout: int
+) -> Optional[str]:
+    if not is_public_ip(ip_address):
+        return None
+
+    try:
+        encoded_ip = urllib.parse.quote(ip_address, safe=":")
+        location_url = location_api_url.format(ip=encoded_ip)
+        location_request = urllib.request.Request(
+            location_url,
+            headers={"Accept": "application/json", "User-Agent": "Frigate"},
+            method="GET",
+        )
+
+        with urllib.request.urlopen(location_request, timeout=timeout) as response:
+            if response.status >= 400:
+                logger.error(
+                    f"Login location lookup failed with status {response.status}"
+                )
+                return None
+            location_data = json.loads(response.read().decode("utf-8"))
+
+        if location_data.get("error") or location_data.get("status") == "fail":
+            logger.debug(f"Login location lookup failed for IP address: {ip_address}")
+            return None
+
+        city = location_data.get("city")
+        region = location_data.get("region") or location_data.get("regionName")
+        country = location_data.get("country_name") or location_data.get("country")
+        latitude = location_data.get("latitude") or location_data.get("lat")
+        longitude = location_data.get("longitude") or location_data.get("lon")
+
+        location_parts = [part for part in [city, region, country] if part]
+        location = ", ".join(location_parts)
+        if latitude is not None and longitude is not None:
+            coordinates = f"{latitude}, {longitude}"
+            location = f"{location} ({coordinates})" if location else coordinates
+
+        return location or None
+    except urllib.error.HTTPError as e:
+        logger.error(f"Login location lookup failed with status {e.code}")
+    except Exception as e:
+        logger.error(f"Unable to look up login request location: {e}")
+
+    return None
+
+
 def send_login_success_telegram_message(request: Request, user: str) -> None:
     telegram_config = request.app.frigate_config.auth.login_telegram
 
@@ -224,12 +282,19 @@ def send_login_success_telegram_message(request: Request, user: str) -> None:
     try:
         login_time = datetime.now().astimezone().strftime("%Y-%m-%d %H:%M:%S %Z")
         login_ip = get_login_request_ip(request)
+        login_location = None
+        if telegram_config.include_location:
+            login_location = get_login_request_location(
+                login_ip, telegram_config.location_api_url, telegram_config.timeout
+            )
         message = (
             "<b>Frigate login succeeded</b>\n"
             f"User: {html.escape(user)}\n"
             f"Time: {html.escape(login_time)}\n"
             f"IP address: {html.escape(login_ip)}"
         )
+        if login_location:
+            message = f"{message}\nLocation: {html.escape(login_location)}"
         payload = {
             "chat_id": telegram_config.chat_id,
             "text": message,

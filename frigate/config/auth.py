@@ -8,11 +8,21 @@ __all__ = ["AuthConfig", "LoginTelegramConfig"]
 
 
 class LoginTelegramConfig(FrigateBaseModel):
-    enabled: bool = Field(default=False, title="Send a Telegram message on successful login")
+    enabled: bool = Field(
+        default=False, title="Send a Telegram message on successful login"
+    )
     bot_token: Optional[str] = Field(default=None, title="Telegram bot token")
     chat_id: Optional[str] = Field(default=None, title="Telegram chat ID")
     parse_mode: Optional[str] = Field(
         default="HTML", title="Telegram message parse mode"
+    )
+    include_location: bool = Field(
+        default=True,
+        title="Include approximate public IP geolocation in Telegram login alerts",
+    )
+    location_api_url: str = Field(
+        default="https://ipapi.co/{ip}/json/",
+        title="IP geolocation API URL. Use {ip} as the IP address placeholder.",
     )
     timeout: int = Field(default=10, title="Telegram request timeout", ge=1)
 
