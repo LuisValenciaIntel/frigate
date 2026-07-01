@@ -37,6 +37,8 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=[Tags.auth])
 
+notified_login_tokens: dict[str, int] = {}
+
 
 class RateLimiter:
     _limit = ""
@@ -267,10 +269,31 @@ def get_login_request_location(
     return None
 
 
+def get_token_notification_key(encoded_token: str) -> str:
+    return hashlib.sha256(encoded_token.encode("utf-8")).hexdigest()
+
+
+def send_login_success_telegram_message_once(
+    request: Request, user: str, encoded_token: str, expiration: int
+) -> None:
+    current_time = int(time.time())
+    for token_key, token_expiration in list(notified_login_tokens.items()):
+        if token_expiration <= current_time:
+            del notified_login_tokens[token_key]
+
+    token_key = get_token_notification_key(encoded_token)
+    if token_key in notified_login_tokens:
+        return
+
+    notified_login_tokens[token_key] = expiration
+    send_login_success_telegram_message(request, user)
+
+
 def send_login_success_telegram_message(request: Request, user: str) -> None:
     telegram_config = request.app.frigate_config.auth.login_telegram
 
     if not telegram_config.enabled:
+        logger.debug("Login Telegram notification is disabled.")
         return
 
     if not telegram_config.bot_token or not telegram_config.chat_id:
@@ -296,7 +319,7 @@ def send_login_success_telegram_message(request: Request, user: str) -> None:
         if login_location:
             message = f"{message}\nLocation: {html.escape(login_location)}"
         payload = {
-            "chat_id": telegram_config.chat_id,
+            "chat_id": str(telegram_config.chat_id),
             "text": message,
             "disable_web_page_preview": True,
         }
@@ -315,12 +338,27 @@ def send_login_success_telegram_message(request: Request, user: str) -> None:
         with urllib.request.urlopen(
             telegram_request, timeout=telegram_config.timeout
         ) as response:
+            response_body = response.read().decode("utf-8")
             if response.status >= 400:
                 logger.error(
-                    f"Telegram login notification failed with status {response.status}"
+                    f"Telegram login notification failed with status {response.status}: {response_body}"
                 )
+                return
+
+        response_data = json.loads(response_body)
+        if not response_data.get("ok", False):
+            logger.error(
+                "Telegram login notification failed: "
+                f"{response_data.get('description', 'unknown error')}"
+            )
+            return
+
+        logger.info("Telegram login notification sent successfully.")
     except urllib.error.HTTPError as e:
-        logger.error(f"Telegram login notification failed with status {e.code}")
+        error_body = e.read().decode("utf-8", errors="replace")
+        logger.error(
+            f"Telegram login notification failed with status {e.code}: {error_body}"
+        )
     except Exception as e:
         logger.error(f"Unable to send successful login Telegram message: {e}")
 
@@ -432,6 +470,11 @@ def auth(request: Request):
                 new_encoded_jwt,
                 new_expiration,
                 JWT_COOKIE_SECURE,
+            )
+
+        if jwt_source == "authorization":
+            send_login_success_telegram_message_once(
+                request, user, encoded_token, expiration
             )
 
         success_response.headers["remote-user"] = user

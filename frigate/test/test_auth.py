@@ -5,9 +5,18 @@ from unittest.mock import MagicMock, patch
 
 from frigate.api.auth import (
     get_login_request_location,
+    notified_login_tokens,
+    send_login_success_telegram_message_once,
     send_login_success_telegram_message,
 )
 from frigate.config.auth import AuthConfig, LoginTelegramConfig
+
+
+def create_telegram_response():
+    response = MagicMock()
+    response.__enter__.return_value.status = 200
+    response.__enter__.return_value.read.return_value = b'{"ok": true}'
+    return response
 
 
 def create_request(
@@ -64,8 +73,7 @@ class TestAuthLoginTelegram(unittest.TestCase):
             )
         )
 
-        response = MagicMock()
-        response.__enter__.return_value.status = 200
+        response = create_telegram_response()
 
         with patch("frigate.api.auth.urllib.request.urlopen") as mock_urlopen:
             mock_urlopen.return_value = response
@@ -96,8 +104,7 @@ class TestAuthLoginTelegram(unittest.TestCase):
             )
         )
 
-        response = MagicMock()
-        response.__enter__.return_value.status = 200
+        response = create_telegram_response()
 
         with patch("frigate.api.auth.urllib.request.urlopen") as mock_urlopen:
             mock_urlopen.return_value = response
@@ -161,8 +168,7 @@ class TestAuthLoginTelegram(unittest.TestCase):
                 "country_name": "United States",
             }
         ).encode("utf-8")
-        telegram_response = MagicMock()
-        telegram_response.__enter__.return_value.status = 200
+        telegram_response = create_telegram_response()
 
         with patch("frigate.api.auth.urllib.request.urlopen") as mock_urlopen:
             mock_urlopen.side_effect = [location_response, telegram_response]
@@ -174,6 +180,31 @@ class TestAuthLoginTelegram(unittest.TestCase):
         payload = json.loads(telegram_request.data.decode("utf-8"))
         assert "IP address: 8.8.8.8" in payload["text"]
         assert "Location: Mountain View, California, United States" in payload["text"]
+
+    def test_send_login_success_telegram_message_once_sends_once_per_token(self):
+        notified_login_tokens.clear()
+        request = create_request(
+            LoginTelegramConfig(
+                enabled=True,
+                bot_token="123456:telegram-token",
+                chat_id="987654321",
+            )
+        )
+
+        response = create_telegram_response()
+
+        with patch("frigate.api.auth.urllib.request.urlopen") as mock_urlopen:
+            mock_urlopen.return_value = response
+
+            send_login_success_telegram_message_once(
+                request, "admin", "encoded-token", 9999999999
+            )
+            send_login_success_telegram_message_once(
+                request, "admin", "encoded-token", 9999999999
+            )
+
+        mock_urlopen.assert_called_once()
+        notified_login_tokens.clear()
 
 
 if __name__ == "__main__":

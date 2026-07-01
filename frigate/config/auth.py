@@ -1,6 +1,6 @@
 from typing import Optional
 
-from pydantic import Field
+from pydantic import Field, field_validator
 
 from .base import FrigateBaseModel
 
@@ -17,7 +17,7 @@ class LoginTelegramConfig(FrigateBaseModel):
         default="HTML", title="Telegram message parse mode"
     )
     include_location: bool = Field(
-        default=True,
+        default=False,
         title="Include approximate public IP geolocation in Telegram login alerts",
     )
     location_api_url: str = Field(
@@ -25,6 +25,13 @@ class LoginTelegramConfig(FrigateBaseModel):
         title="IP geolocation API URL. Use {ip} as the IP address placeholder.",
     )
     timeout: int = Field(default=10, title="Telegram request timeout", ge=1)
+
+    @field_validator("chat_id", mode="before")
+    @classmethod
+    def coerce_chat_id(cls, value):
+        if value is None:
+            return value
+        return str(value)
 
 
 class AuthConfig(FrigateBaseModel):
