@@ -2,6 +2,7 @@
 
 import base64
 import hashlib
+import html
 import ipaddress
 import json
 import logging
@@ -9,6 +10,8 @@ import os
 import re
 import secrets
 import time
+import urllib.error
+import urllib.request
 from datetime import datetime
 from pathlib import Path
 
@@ -47,7 +50,16 @@ rateLimiter = RateLimiter()
 
 
 def get_remote_addr(request: Request):
-    route = list(reversed(request.headers.get("x-forwarded-for").split(",")))
+    forwarded_for = request.headers.get("x-forwarded-for")
+    if forwarded_for is None:
+        client = getattr(request, "client", None)
+        if client is not None and getattr(client, "host", None):
+            return client.host
+
+        remote_addr = getattr(request, "remote_addr", None)
+        return remote_addr or "127.0.0.1"
+
+    route = list(reversed(forwarded_for.split(",")))
     logger.debug(f"IP Route: {[r for r in route]}")
     trusted_proxies = []
     for proxy in request.app.frigate_config.auth.trusted_proxies:
@@ -55,6 +67,7 @@ def get_remote_addr(request: Request):
             network = ipaddress.ip_network(proxy)
         except ValueError:
             logger.warning(f"Unable to parse trusted network: {proxy}")
+            continue
         trusted_proxies.append(network)
 
     # return the first remote address that is not trusted
@@ -182,6 +195,69 @@ def set_jwt_cookie(response: Response, cookie_name, encoded_jwt, expiration, sec
         expires=expiration,
         secure=secure,
     )
+
+
+def get_login_request_ip(request: Request) -> str:
+    forwarded_for = request.headers.get("x-forwarded-for")
+    if forwarded_for:
+        return forwarded_for.split(",", 1)[0].strip()
+
+    client = getattr(request, "client", None)
+    if client is not None and getattr(client, "host", None):
+        return client.host
+
+    return "unknown"
+
+
+def send_login_success_telegram_message(request: Request, user: str) -> None:
+    telegram_config = request.app.frigate_config.auth.login_telegram
+
+    if not telegram_config.enabled:
+        return
+
+    if not telegram_config.bot_token or not telegram_config.chat_id:
+        logger.warning(
+            "Login Telegram notification is enabled, but bot_token or chat_id is not configured."
+        )
+        return
+
+    try:
+        login_time = datetime.now().astimezone().strftime("%Y-%m-%d %H:%M:%S %Z")
+        login_ip = get_login_request_ip(request)
+        message = (
+            "<b>Frigate login succeeded</b>\n"
+            f"User: {html.escape(user)}\n"
+            f"Time: {html.escape(login_time)}\n"
+            f"IP address: {html.escape(login_ip)}"
+        )
+        payload = {
+            "chat_id": telegram_config.chat_id,
+            "text": message,
+            "disable_web_page_preview": True,
+        }
+
+        if telegram_config.parse_mode:
+            payload["parse_mode"] = telegram_config.parse_mode
+
+        data = json.dumps(payload).encode("utf-8")
+        telegram_request = urllib.request.Request(
+            f"https://api.telegram.org/bot{telegram_config.bot_token}/sendMessage",
+            data=data,
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+
+        with urllib.request.urlopen(
+            telegram_request, timeout=telegram_config.timeout
+        ) as response:
+            if response.status >= 400:
+                logger.error(
+                    f"Telegram login notification failed with status {response.status}"
+                )
+    except urllib.error.HTTPError as e:
+        logger.error(f"Telegram login notification failed with status {e.code}")
+    except Exception as e:
+        logger.error(f"Unable to send successful login Telegram message: {e}")
 
 
 # Endpoint for use with nginx auth_request
@@ -339,6 +415,7 @@ def login(request: Request, body: AppPostLoginBody):
         set_jwt_cookie(
             response, JWT_COOKIE_NAME, encoded_jwt, expiration, JWT_COOKIE_SECURE
         )
+        send_login_success_telegram_message(request, user)
         return response
     return JSONResponse(content={"message": "Login failed"}, status_code=401)
 

@@ -4,7 +4,17 @@ from pydantic import Field
 
 from .base import FrigateBaseModel
 
-__all__ = ["AuthConfig"]
+__all__ = ["AuthConfig", "LoginTelegramConfig"]
+
+
+class LoginTelegramConfig(FrigateBaseModel):
+    enabled: bool = Field(default=False, title="Send a Telegram message on successful login")
+    bot_token: Optional[str] = Field(default=None, title="Telegram bot token")
+    chat_id: Optional[str] = Field(default=None, title="Telegram chat ID")
+    parse_mode: Optional[str] = Field(
+        default="HTML", title="Telegram message parse mode"
+    )
+    timeout: int = Field(default=10, title="Telegram request timeout", ge=1)
 
 
 class AuthConfig(FrigateBaseModel):
@@ -31,6 +41,10 @@ class AuthConfig(FrigateBaseModel):
     trusted_proxies: list[str] = Field(
         default=[],
         title="Trusted proxies for determining IP address to rate limit",
+    )
+    login_telegram: LoginTelegramConfig = Field(
+        default_factory=LoginTelegramConfig,
+        title="Telegram notification configuration for successful logins",
     )
     # As of Feb 2023, OWASP recommends 600000 iterations for PBKDF2-SHA256
     hash_iterations: int = Field(default=600000, title="Password hash iterations")
