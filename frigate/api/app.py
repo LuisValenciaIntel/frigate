@@ -144,8 +144,6 @@ def config(request: Request):
     )
     username = request.headers.get("remote-user")
 
-    filter_camera_groups_by_user(config, username, request.app.frigate_config.auth.enabled)
-
     # remove the mqtt password
     config["mqtt"].pop("password", None)
 
@@ -167,6 +165,8 @@ def config(request: Request):
         # ensure that zones are relative
         for zone_name, zone in config_obj.cameras[camera_name].zones.items():
             camera_dict["zones"][zone_name]["color"] = zone.color
+
+    filter_camera_groups_by_user(config, username, request.app.frigate_config.auth.enabled)
 
 
     # remove go2rtc stream passwords
