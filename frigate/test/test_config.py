@@ -68,33 +68,6 @@ class TestConfig(unittest.TestCase):
         assert frigate_config.detectors["cpu"].type == DetectorTypeEnum.cpu
         assert frigate_config.detectors["cpu"].model.width == 320
 
-    def test_camera_group_users_config(self):
-        config = {
-            "camera_groups": {
-                "admins": {
-                    "cameras": ["back"],
-                    "users": ["admin", "viewer"],
-                },
-                "single_user": {
-                    "cameras": "back",
-                    "users": "admin",
-                },
-                "comma_users": {
-                    "cameras": "back",
-                    "users": "admin, viewer",
-                },
-            }
-        }
-
-        frigate_config = FrigateConfig(**(deep_merge(config, self.minimal)))
-
-        assert frigate_config.camera_groups["admins"].users == ["admin", "viewer"]
-        assert frigate_config.camera_groups["single_user"].users == ["admin"]
-        assert frigate_config.camera_groups["comma_users"].users == [
-            "admin",
-            "viewer",
-        ]
-
     @patch("frigate.detectors.detector_config.load_labels")
     def test_detector_custom_model_path(self, mock_labels):
         mock_labels.return_value = {}

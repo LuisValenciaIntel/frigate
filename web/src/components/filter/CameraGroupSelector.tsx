@@ -1,7 +1,7 @@
 import { CameraGroupConfig, FrigateConfig } from "@/types/frigateConfig";
 import { isDesktop, isMobile } from "react-device-detect";
 import useSWR from "swr";
-import { MdHome } from "react-icons/md";
+/*import { MdHome } from "react-icons/md";*/
 import { usePersistedOverlayState } from "@/hooks/use-overlay-state";
 import { Button, buttonVariants } from "../ui/button";
 import { useCallback, useMemo, useState } from "react";
