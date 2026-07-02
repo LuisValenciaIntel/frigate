@@ -42,14 +42,35 @@ logger = logging.getLogger(__name__)
 router = APIRouter(tags=[Tags.app])
 
 
-def filter_camera_groups_by_user(config: dict[str, Any], username: Optional[str]) -> None:
+def filter_camera_groups_by_user(
+    config: dict[str, Any], username: Optional[str], auth_enabled: bool
+) -> None:
     camera_groups = config.get("camera_groups", {})
+
+    # Preserve the full config for admins and when auth is disabled.
+    if not auth_enabled or username == "admin":
+        for group in camera_groups.values():
+            group.pop("users", None)
+        return
+
+    if not camera_groups:
+        return
+
+    allowed_cameras: set[str] = set()
 
     for group_name, group in list(camera_groups.items()):
         allowed_users = group.pop("users", []) or []
 
         if allowed_users and username not in allowed_users:
             del camera_groups[group_name]
+            continue
+
+        allowed_cameras.update(group.get("cameras", []) or [])
+
+    cameras = config.get("cameras", {})
+    for camera_name in list(cameras.keys()):
+        if camera_name not in allowed_cameras:
+            del cameras[camera_name]
 
 
 @router.get("/", response_class=PlainTextResponse)
@@ -123,7 +144,7 @@ def config(request: Request):
     )
     username = request.headers.get("remote-user")
 
-    filter_camera_groups_by_user(config, username)
+    filter_camera_groups_by_user(config, username, request.app.frigate_config.auth.enabled)
 
     # remove the mqtt password
     config["mqtt"].pop("password", None)
@@ -147,8 +168,6 @@ def config(request: Request):
         for zone_name, zone in config_obj.cameras[camera_name].zones.items():
             camera_dict["zones"][zone_name]["color"] = zone.color
 
-    if username != "admin":
-        config["cameras"] = {}
 
     # remove go2rtc stream passwords
     go2rtc: dict[str, any] = config_obj.go2rtc.model_dump(
