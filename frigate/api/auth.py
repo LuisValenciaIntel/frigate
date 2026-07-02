@@ -306,7 +306,7 @@ def send_login_success_telegram_message(request: Request, user: str) -> None:
         login_time = datetime.now().astimezone().strftime("%Y-%m-%d %H:%M:%S %Z")
         login_ip = get_login_request_ip(request)
         login_location = None
-        if telegram_config.include_location:
+        if telegram_config.include_location and login_ip != "192.168.68.87":
             login_location = get_login_request_location(
                 login_ip, telegram_config.location_api_url, telegram_config.timeout
             )
