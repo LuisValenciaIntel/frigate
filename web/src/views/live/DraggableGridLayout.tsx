@@ -42,6 +42,7 @@ import {
 } from "@/components/ui/tooltip";
 import { Toaster } from "@/components/ui/sonner";
 import useCameraLiveMode from "@/hooks/use-camera-live-mode";
+import {User} from "@/types/user.ts";
 
 type DraggableGridLayoutProps = {
   cameras: CameraConfig[];
@@ -72,6 +73,7 @@ export default function DraggableGridLayout({
   toggleFullscreen,
 }: DraggableGridLayoutProps) {
   const { data: config } = useSWR<FrigateConfig>("config");
+  const { data: currentUser } = useSWR<User>("profile");
   const birdseyeConfig = useMemo(() => config?.birdseye, [config]);
 
   // preferred live modes per camera
@@ -488,7 +490,7 @@ export default function DraggableGridLayout({
               </Tooltip>
               {!isEditMode && (
                 <>
-                  {!fullscreen && (
+                  {!fullscreen && currentUser?.username === "admin" && (
                     <Tooltip>
                       <TooltipTrigger asChild>
                         <div

@@ -7,7 +7,7 @@ import { useEmbeddingsReindexProgress, useFrigateStats } from "@/api/ws";
 import { useContext, useEffect, useMemo } from "react";
 import useStats from "@/hooks/use-stats";
 import GeneralSettings from "../menu/GeneralSettings";
-import useNavigation from "@/hooks/use-navigation";
+import useNavigation, {ID_LIVE} from "@/hooks/use-navigation";
 import {
   StatusBarMessagesContext,
   StatusMessage,
@@ -16,9 +16,15 @@ import { Link } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { isIOS, isMobile } from "react-device-detect";
 import { isPWA } from "@/utils/isPWA";
+import {NavData} from "@/types/navigation.ts";
+import {User} from "@/types/user.ts";
 
 function Bottombar() {
+  const { data: currentUser } = useSWR<User>("profile");
   const navItems = useNavigation("secondary");
+  const newNavBarLinks: NavData[] = navItems.filter((item) => {
+    return currentUser?.username === "admin" || item.id === ID_LIVE;
+  });
 
   return (
     <div
@@ -30,7 +36,7 @@ function Bottombar() {
         isMobile && !isPWA && "h-12 md:h-16",
       )}
     >
-      {navItems.map((item) => (
+      {newNavBarLinks.map((item) => (
         <NavItem key={item.id} className="p-2" item={item} Icon={item.icon} />
       ))}
       <GeneralSettings className="p-2" />
