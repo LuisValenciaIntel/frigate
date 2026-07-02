@@ -14,3 +14,13 @@ cameras:
       height: 1080
       width: 1920
       fps: 5
+
+camera_groups:
+  admins:
+    cameras:
+      - test
+    icon: generic
+    order: 0
+    users:
+      - admin
+

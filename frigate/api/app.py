@@ -42,6 +42,16 @@ logger = logging.getLogger(__name__)
 router = APIRouter(tags=[Tags.app])
 
 
+def filter_camera_groups_by_user(config: dict[str, Any], username: Optional[str]) -> None:
+    camera_groups = config.get("camera_groups", {})
+
+    for group_name, group in list(camera_groups.items()):
+        allowed_users = group.pop("users", []) or []
+
+        if allowed_users and username not in allowed_users:
+            del camera_groups[group_name]
+
+
 @router.get("/", response_class=PlainTextResponse)
 def is_healthy():
     return "Frigate is running. Alive and healthy!"
@@ -111,6 +121,9 @@ def config(request: Request):
     config: dict[str, dict[str, any]] = config_obj.model_dump(
         mode="json", warnings="none", exclude_none=True
     )
+    username = request.headers.get("remote-user")
+
+    filter_camera_groups_by_user(config, username)
 
     # remove the mqtt password
     config["mqtt"].pop("password", None)

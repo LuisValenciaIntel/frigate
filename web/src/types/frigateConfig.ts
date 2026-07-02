@@ -228,6 +228,7 @@ export type CameraGroupConfig = {
   cameras: string[];
   icon: IconName;
   order: number;
+  users?: string[];
 };
 
 export interface FrigateConfig {
