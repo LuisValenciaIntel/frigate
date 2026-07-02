@@ -147,6 +147,9 @@ def config(request: Request):
         for zone_name, zone in config_obj.cameras[camera_name].zones.items():
             camera_dict["zones"][zone_name]["color"] = zone.color
 
+    if username != "admin":
+        config["cameras"] = {}
+
     # remove go2rtc stream passwords
     go2rtc: dict[str, any] = config_obj.go2rtc.model_dump(
         mode="json", warnings="none", exclude_none=True
