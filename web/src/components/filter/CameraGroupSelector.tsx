@@ -1,10 +1,11 @@
 import { CameraGroupConfig, FrigateConfig } from "@/types/frigateConfig";
+import { User } from "@/types/user";
 import { isDesktop, isMobile } from "react-device-detect";
 import useSWR from "swr";
-/*import { MdHome } from "react-icons/md";*/
+import { MdHome } from "react-icons/md";
 import { usePersistedOverlayState } from "@/hooks/use-overlay-state";
 import { Button, buttonVariants } from "../ui/button";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "../ui/tooltip";
 import { LuPencil, LuPlus } from "react-icons/lu";
 import {
@@ -72,6 +73,7 @@ type CameraGroupSelectorProps = {
 };
 export function CameraGroupSelector({ className }: CameraGroupSelectorProps) {
   const { data: config } = useSWR<FrigateConfig>("config");
+  const { data: currentUser } = useSWR<User>("profile");
 
   // tooltip
 
@@ -109,11 +111,25 @@ export function CameraGroupSelector({ className }: CameraGroupSelectorProps) {
     );
   }, [config]);
 
+  const firstGroup = groups[0]?.[0];
+
+  useEffect(() => {
+    if (!firstGroup) {
+      return;
+    }
+
+    const hasSelectedGroup = groups.some(([name]) => name === group);
+    if (!group || group === "default" || !hasSelectedGroup) {
+      setGroup(firstGroup, true);
+    }
+  }, [firstGroup, group, groups, setGroup]);
+
   // add group
 
   const [addGroup, setAddGroup] = useState(false);
 
   const Scroller = isMobile ? ScrollArea : "div";
+  const showAllCamerasButton = currentUser?.username === "admin";
 
   return (
     <>
@@ -133,29 +149,31 @@ export function CameraGroupSelector({ className }: CameraGroupSelectorProps) {
             isDesktop ? "flex-col" : "whitespace-nowrap",
           )}
         >
-          {/*<Tooltip open={tooltip == "default"}>
-            <TooltipTrigger asChild>
-              <Button
-                className={
-                  group == "default"
-                    ? "bg-blue-900 bg-opacity-60 text-selected focus:bg-blue-900 focus:bg-opacity-60"
-                    : "bg-secondary text-secondary-foreground focus:bg-secondary focus:text-secondary-foreground"
-                }
-                aria-label="All Cameras"
-                size="xs"
-                onClick={() => (group ? setGroup("default", true) : null)}
-                onMouseEnter={() => (isDesktop ? showTooltip("default") : null)}
-                onMouseLeave={() => (isDesktop ? showTooltip(undefined) : null)}
-              >
-                <MdHome className="size-4" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipPortal>
-              <TooltipContent className="capitalize" side="right">
-                All Cameras
-              </TooltipContent>
-            </TooltipPortal>
-          </Tooltip>*/}
+          {showAllCamerasButton && (
+            <Tooltip open={tooltip == "default"}>
+              <TooltipTrigger asChild>
+                <Button
+                  className={
+                    group == "default"
+                      ? "bg-blue-900 bg-opacity-60 text-selected focus:bg-blue-900 focus:bg-opacity-60"
+                      : "bg-secondary text-secondary-foreground focus:bg-secondary focus:text-secondary-foreground"
+                  }
+                  aria-label="All Cameras"
+                  size="xs"
+                  onClick={() => (group ? setGroup("default", true) : null)}
+                  onMouseEnter={() => (isDesktop ? showTooltip("default") : null)}
+                  onMouseLeave={() => (isDesktop ? showTooltip(undefined) : null)}
+                >
+                  <MdHome className="size-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipPortal>
+                <TooltipContent className="capitalize" side="right">
+                  All Cameras
+                </TooltipContent>
+              </TooltipPortal>
+            </Tooltip>
+          )}
           {groups.map(([name, config]) => {
             return (
               <Tooltip key={name} open={tooltip == name}>
