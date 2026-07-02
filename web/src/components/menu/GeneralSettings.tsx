@@ -82,7 +82,8 @@ export default function GeneralSettings({ className }: GeneralSettingsProps) {
   return (
     <>
       <Container modal={!isDesktop}>
-        <Trigger>
+        { profile?.username === "admin"  && (
+            <Trigger>
           <Tooltip>
             <TooltipTrigger asChild>
               <div
@@ -103,7 +104,8 @@ export default function GeneralSettings({ className }: GeneralSettingsProps) {
               </TooltipContent>
             </TooltipPortal>
           </Tooltip>
-        </Trigger>
+        </Trigger>)
+        }
         <Content
           style={
             isDesktop

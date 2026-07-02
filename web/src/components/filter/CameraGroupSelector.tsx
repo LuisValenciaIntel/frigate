@@ -209,14 +209,14 @@ export function CameraGroupSelector({ className }: CameraGroupSelectorProps) {
             );
           })}
 
-          <Button
+         {showAllCamerasButton && ( <Button
             className="bg-secondary text-muted-foreground"
             aria-label="Add camera group"
             size="xs"
             onClick={() => setAddGroup(true)}
           >
             <LuPlus className="size-4 text-primary" />
-          </Button>
+          </Button> )}
           {isMobile && <ScrollBar orientation="horizontal" className="h-0" />}
         </div>
       </Scroller>

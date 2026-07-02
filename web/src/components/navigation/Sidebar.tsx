@@ -4,17 +4,24 @@ import { CameraGroupSelector } from "../filter/CameraGroupSelector";
 import { Link, useMatch } from "react-router-dom";
 import GeneralSettings from "../menu/GeneralSettings";
 import AccountSettings from "../menu/AccountSettings";
-import useNavigation from "@/hooks/use-navigation";
+import useNavigation, { ID_LIVE } from "@/hooks/use-navigation";
 import { baseUrl } from "@/api/baseUrl";
 import { useMemo } from "react";
+import useSWR from "swr";
+import {User} from "@/types/user.ts";
+import {NavData} from "@/types/navigation.ts";
 
 function Sidebar() {
   const basePath = useMemo(() => new URL(baseUrl).pathname, []);
+  const { data: currentUser } = useSWR<User>("profile");
 
   const isRootMatch = useMatch("/");
   const isBasePathMatch = useMatch(basePath);
 
   const navbarLinks = useNavigation();
+  const newNavBarLinks: NavData[] = navbarLinks.filter((item) => {
+    return currentUser?.username === "admin" || item.id === ID_LIVE;
+  });
 
   return (
     <aside className="scrollbar-container scrollbar-hidden absolute inset-y-0 left-0 z-10 flex w-[52px] flex-col justify-between overflow-y-auto border-r border-secondary-highlight bg-background_alt py-4">
@@ -23,7 +30,7 @@ function Sidebar() {
         <Link to="/">
           <Logo className="mb-6 h-8 w-8" />
         </Link>
-        {navbarLinks.map((item) => {
+        {newNavBarLinks.map((item) => {
           const showCameraGroups =
             (isRootMatch || isBasePathMatch) && item.id === 1;
 
