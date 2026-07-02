@@ -133,7 +133,7 @@ export function CameraGroupSelector({ className }: CameraGroupSelectorProps) {
             isDesktop ? "flex-col" : "whitespace-nowrap",
           )}
         >
-          <Tooltip open={tooltip == "default"}>
+          {/*<Tooltip open={tooltip == "default"}>
             <TooltipTrigger asChild>
               <Button
                 className={
@@ -155,7 +155,7 @@ export function CameraGroupSelector({ className }: CameraGroupSelectorProps) {
                 All Cameras
               </TooltipContent>
             </TooltipPortal>
-          </Tooltip>
+          </Tooltip>*/}
           {groups.map(([name, config]) => {
             return (
               <Tooltip key={name} open={tooltip == name}>
